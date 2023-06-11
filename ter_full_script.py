@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+The following script contains all the code used to run the analyses, as well as the code to reproduce all the figures
+
 Excitation/Inhibition Ratio in Python. 
 Matlab to Python translation from Bruining et al (2020) :
 Bruining, H., Hardstone, R., Juarez-Martinez, E.L. et al. 
@@ -8,6 +10,8 @@ Measurement of excitation-inhibition ratio in autism spectrum disorder using cri
 Sci Rep 10, 9195 (2020). https://doi.org/10.1038/s41598-020-65500-4
 
 Original fEI Matlab script : https://github.com/rhardstone/fEI/blob/master/calculateFEI.m
+
+
 
 @author: Julien Pichot 
 """
@@ -31,14 +35,12 @@ from functools import partial
 
 %matplotlib qt
 
-#matplotlib.use('Qt5Agg')
 import seaborn as sns
 import glob
 from collections import OrderedDict
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
 from mne.channels import make_standard_montage
-
 
 
 # for fEI and DFA 
@@ -65,11 +67,6 @@ from sklearn.cluster import MeanShift
 from sklearn.mixture import BayesianGaussianMixture
 
 
-
-#from mne.filter import _my_hilbert
-
-#from autoreject import AutoReject, compute_thresholds, Ransac
-#%% 
 """fEI function"""  
 """
 Input : 
@@ -135,13 +132,12 @@ def calculate_fei(Signal, window_size, window_overlap):
         xSignal = signal_profile[all_window_index]                                        
         xSignal = np.divide(xSignal, xAmp).T   
                      
-        _, fluc, _, _, _ = np.polyfit(np.arange(window_size), xSignal, deg=1, full=True) # arthur
+        _, fluc, _, _, _ = np.polyfit(np.arange(window_size), xSignal, deg=1, full=True) 
         # Convert to root-mean squared error, from squared error
-        w_detrended_normalized_fluctuations = np.sqrt(fluc / window_size) #arthur 
+        w_detrended_normalized_fluctuations = np.sqrt(fluc / window_size)  
     
         EI[i_channel] = 1 - pearsonr(w_detrended_normalized_fluctuations, w_original_amplitude)[0]
-        #EI[i_channel] = 1 - np.corrcoef(w_original_amplitude, w_detrended_normalized_fluctuations)[0, 1] arthur script 
-        # np.corrcoef et pearsonr font exactement la même chose aussi 
+
 
         gesd_alpha = 0.05
         max_outliers_percentage = 0.025  # this is set to 0.025 per dimension (2-dim: wAmp and wDNF), so 0.05 is max
@@ -211,55 +207,6 @@ DFA_criterion = np.mean(DFAExponent)
 EI,fEI_outliers_removed, wAmp, wDNF = calculate_fei(Signal, window_size, window_overlap)
 
 
-#%%% For a single subject 
-"""  
-# Import data
-"""
-
-sub = 'REC-220718-A-RS_eeg'
-filename = 'EEG_rdb/EEG_final_and_f7/%s.fif' % sub
-filename = '/Users/julienpichot/Documents/EEG_test/REC-180322-A-RS_eeg.fif'
-raw = mne.io.read_raw_fif(filename, preload=(True),verbose=True) 
-raw.plot()
-#raw.interpolate_bads(reset_bads=True)
-#raw.save(filename, overwrite=True)
-raw.plot_psd()
-""" Drop bad channels """"
-#raw.info['bads'] = ['E14','E17','E21','E48','E119','E126','E127']
-#raw.save(filename, overwrite=True)
-raw= raw.drop_channels(['E14','E17','E21','E48','E119','E126','E127'])
-raw.resample(1000) ## Drop channels out of the scalp
-raw.info['bads'] # check that there are no more bads
-raw.info
-#""" Filtered between 8 and 13 Hz """
-raw= raw.filter(8, 13, l_trans_bandwidth='auto', h_trans_bandwidth='auto')
-raw = raw.filter(l_freq=frequency_band[0],h_freq=frequency_band[1],
-                             filter_length='auto', l_trans_bandwidth='auto', h_trans_bandwidth='auto',
-                             fir_window='hamming',phase='zero',fir_design="firwin",
-                             pad='reflect_limited', verbose=0)
-
-#raw.crop(tmax=raw.times[-1] - 1, tmin=1/sfreq)
-
-#raw.crop(tmin=1.0, tmax=raw.times[-2])
-#sfreq = raw.info['sfreq']
-
-# define the start and end times for cropping
-start_time = raw.times[0] +1
-end_time = raw.times[-1] - 1
-# crop the data
-raw=raw.crop(tmin=start_time, tmax=end_time)
-
-# check the updated times
-print(raw.times[0], raw.times[-1])
-#""" Compute Hilbert amplitude envelope of the filtered signal """
-raw=raw.apply_hilbert(picks=['eeg'], envelope = True,verbose='debug')
-
-
-""" Select the data to use in the calculation  """
-Signal = raw.get_data(reject_by_annotation='omit', picks = 'eeg') # Transpose to obtain (num_samples, num_channels) 
-
-
-#%% 
 """ RUN fei ratio script For all subject""" 
 
 # Define the folder containing the EEG files
@@ -295,7 +242,6 @@ df=pd.DataFrame()
 bad_files = []
 fEI_bad_files = []
 
-
 # Loop through all EEG files in the folder
 for file in glob.glob(os.path.join(folder, '*.fif')):
     
@@ -312,7 +258,6 @@ for file in glob.glob(os.path.join(folder, '*.fif')):
         continue
 
     # Pre-process 
-    #raw= raw.filter(8, 13, l_trans_bandwidth='auto', h_trans_bandwidth='auto')
     raw = raw.filter(l_freq=frequency_band[0],h_freq=frequency_band[1],
                                  filter_length='auto', l_trans_bandwidth='auto', h_trans_bandwidth='auto',
                                  fir_window='hamming',phase='zero',fir_design="firwin",
@@ -380,17 +325,11 @@ for file in glob.glob(os.path.join(folder, '*.fif')):
     df['subject'] = df['subject'].str.replace('-RS_eeg', '')
 
 #create the full dataset with EI and clinical variables 
-pheno = pd.read_excel('/Users/julienpichot/Documents/fEI_2023/dataset_fei/fei_dataset.xlsx') ##open dataset with clinical variables
-#pheno = pheno.iloc[:388, :] ## reshape 
+pheno = pd.read_excel('/mypath) ##open dataset with clinical variables
 df = pd.merge(df, pheno, on='subject') # merged the two dataframe 
-
-df.to_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/dnf_219_5s.csv', index=False)
-
-df = pd.read_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/16y_219_5s.csv') # or read_csv if .csv
-df.to_excel('/Users/julienpichot/Documents/fEI_2023/dataset_fei/fei_dataset.xlsx', index = False)
+df.to_csv('/mypath/file.csv', index=False)
 
 #%% PLOT 
-
 """1) Define channel locations """
     """ Set parameters """ 
 #montage = mne.channels.make_standard_montage('GSN-HydroCel-128')
@@ -399,20 +338,11 @@ df.to_excel('/Users/julienpichot/Documents/fEI_2023/dataset_fei/fei_dataset.xlsx
 #sfreq = raw.info['sfreq']
 #ch_types = ['eeg'] * n_channels
 
-    """Real electrodes coordinates 
-    WARNING : We do not use this to plot the topomap, because the real coordinates do not fit to 2D topomap)
-    """
-#    xy_pos = []
-#    for ch in raw.info['chs'][:128]:
-#        pos = ch['loc'][:2] ## if you want x,y or x,y,z (replace [:2] by [:3])
-#        xy_pos.append(pos)
-#    xy_pos = np.array(xy_pos)
 
-    """ USE THIS METHOD TO EXTRACT x,y coordinates for each electrodes that fit to 2D topomap : 
-        Plot sensors then extract coordinates from the figure """
+    """ USE THIS METHOD TO EXTRACT x,y coordinates for each electrodes that fit to 2D topomap """
 #fig = raw.plot_sensors(show_names=True) ## also works with fig=mne.viz.plot_montage(your_montage)
 #ax = fig.axes[0]
-
+                      
 #coordinates = []
 #for point in ax.collections[0].get_offsets():
 #    x, y = point
@@ -423,18 +353,6 @@ df.to_excel('/Users/julienpichot/Documents/fEI_2023/dataset_fei/fei_dataset.xlsx
     """ Next time you just need to load x,y coordinates from .txt file previously save  """
 xy_pos= np.loadtxt('/Users/julienpichot/Documents/fEI_2023/txt_file/electrode_positions.txt')
 
-    """ Position for ROI  """
-xy_roi = xy_pos[[2, 3, 4, 5, 6, 8, 9, 10, 11, 12, 13, 14, 15, 16, 
-                 17, 18, 19, 20, 25, 26, 27, 30, 31, 32, 33, 35,
-                 36, 37, 38, 40, 41, 42, 43, 44, 45, 46, 47, 49,
-                 50, 51, 53, 54, 56, 61, 62, 63, 64, 65, 66, 67,
-                 68, 69, 70, 71, 72, 73, 74, 75, 77, 78, 79, 83, 
-                 84, 86, 87, 88, 89, 91, 92, 92, 93, 96, 97, 98,
-                 99, 100, 101, 102, 103, 104, 105, 106, 107, 108,
-                 109, 110, 111, 113]]
-np.savetxt('EEG_rdb/textfile_to_load/extended_roi_electrodes_position.txt', xy_roi)
-#xy_roi = np.loadtxt('EEG_rdb/textfile_to_load/all_roi_electrodes_position.txt')
-xy_roi =np.loadtxt ('EEG_rdb/textfile_to_load/extended_roi_electrodes_position.txt')
 
 """2)Determine topomap colorbar interval between 5th, 95th percentiles
 Use on all subjects """ 
@@ -443,36 +361,15 @@ def plot_interval(values):
     # Determine the minimum and maximum of the range
     min_range = np.nanpercentile(values, 5)
     max_range = np.nanpercentile(values, 95)
-
     # Make the interval symmetric around 1
     range_diff = max(1 - min_range, max_range - 1)
     min_range_s = 1 - range_diff
     max_range_s = 1 + range_diff
-
     # Round the range to one decimal place
     min_range_r = np.round(min_range_s, 1)
     max_range_r = np.round(max_range_s, 1)
 
     return    min_range_r, max_range_r
-
-"""
-Example for plot one group, see below for plot three groups
-Run all lines at once 
-WARNING : If the plot is not displayed load one record, try raw.plot() then retry
-""" 
-fig, ax = plt.subplots()
-im, _ = mne.viz.plot_topomap(ei_all, pos=xy_pos, vlim=(min_range_r, max_range_r),  cmap='bwr'  ,contours=0,axes=ax)
-cbar = plt.colorbar(im, ax=ax)
-plt.legend(loc='lower center') #loc permet de choisir emplacement légende
-plt.gcf().set_size_inches(7, 6)
-plt.subplots_adjust(top=0.94,
-bottom=0.048,
-left=0.053,
-right=0.985,
-hspace=0.2,
-wspace=0.2)
-ax.set_title('ASD Excitation/Inhibition ratio', fontsize= 18, fontweight='bold')
-plt.show()
 
 
 #%% 
@@ -480,30 +377,23 @@ plt.show()
 """ Define group """
     """All subjects  """
     
-#df=df.drop([35,111, 112])
 ei_all = df.iloc[:, 3:124] ## to obtain the ei ratio for each electrodes for all subject
 ei_all= np.nanmean(ei_all,axis=0)
 # determine interval for plot all electrodes with function plot_interval 
 min_range_r, max_range_r = plot_interval(ei_all)
 
 
-# for EI 130:251
     """ASD """
-asd_ei = df.loc[df['group'] == 'ASD', df.columns[3:124]] ## get only asd patient from dataframe
+asd_ei = df.loc[df['group'] == 'ASD', df.columns[3:124]]
 asd_ei = asd_ei.mean(skipna=True)
-asd_ei =np.nanmedian(asd_ei,axis=0)
-
 
     """Relatives""" 
 relatives_ei= df.loc[df['group'] == 'Relatives', df.columns[3:124]]
 relatives_ei = relatives_ei.mean(skipna=True)
-relatives_ei= np.nanmedian(relatives_ei,axis=0) 
-
 
     """Controls"""
 controls_ei=df.loc[df['group'] == 'Controls', df.columns[3:124]]
 controls_ei = controls_ei.mean(skipna=True)
-controls_ei=np.nanmedian(controls_ei, axis=0)
 
 
 """ Plot three groups for all electrodes """
@@ -523,135 +413,10 @@ axs[2].set_title('Relatives\nn=26', fontsize= 14, fontweight='bold')
 
 plt.subplots_adjust(top=1.0, bottom=0.3, left=0.05, right=0.98, hspace=0.2, wspace=0.2)
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/16y_topomap.png', dpi=300)
-
-""" OR """
-# set figure size and create subplots
-fig, axs = plt.subplots(1, 3, figsize=(16, 7))
-
-# create a list of tuples containing the data and title for each group
-groups = [(asd_ei, 'ASD'), (relatives_ei, 'Relatives'), (controls_ei, 'Controls')]
-
-# create a single colorbar
-cbar_ax = fig.add_axes([0.2, 0.1, 0.6, 0.05])
-
-
-# iterate over the groups and plot their topomaps in the corresponding subplot
-for i, (data, title) in enumerate(groups):
-    im, _ = mne.viz.plot_topomap(data, pos=xy_pos, vmin=min_range_r, vmax=max_range_r, cmap='bwr', contours=0, axes=axs[i])
-    axs[i].set_title(title, fontsize=18, fontweight='bold')
-
-# add colorbar to the figure
-cbar = fig.colorbar(im, cax=cbar_ax, orientation='horizontal')
-cbar.set_label('Excitation/Inhibition ratio', fontsize=18)
-cbar.ax.tick_params(labelsize=14)
-
-# adjust subplot spacing and display the plot
-plt.subplots_adjust(top=1.0,
-bottom=0.125,
-left=0.05,
-right=0.98,
-hspace=0.2,
-wspace=0.2)
-plt.show()
-
-#%% 
-"""Plot by ROI""" 
-
-""" electrodes position for ROI  """
-xy_roi = np.loadtxt('EEG_rdb/textfile_to_load/all_roi_electrodes_position.txt')
-
-"""Define groups for ROI """
-    
-    """ALL subjects FOR ROI """
-all_roi=  df[['E9', 'E11', 'E22', 'E24', 'E33', 'E36','E45', 'E52', 'E58', 'E62','E70', 'E75', 
-              'E83', 'E92', 'E96', 'E104', 'E108',  'E122', 'E124' ]]
-
-# determine interval for plot all electrodes with function plot_interval 
-min_range, max_range, min_range_s, max_range_s, min_range_r, max_range_r, range_diff = plot_interval(all_roi)
-
-# mean by columns if you want to plot all subject ROI topomap 
-all_roi= np.nanmean(all_roi, axis=0)
-
-
-#ASD ROI """
-asd_ei_roi = df.loc[df['group'] == 'ASD', df.columns[3:124]]
-#asd_ei_roi =  asd_ei_roi[['E9', 'E11', 'E22', 'E24', 'E33', 'E36','E45', 'E52', 'E58', 'E62','E70',
-#                         'E75', 'E83', 'E92', 'E96', 'E104', 'E108',  'E122', 'E124' ]]
-
-asd_ei_roi= asd_ei_roi[['E3', 'E4', 'E5', 'E6', 'E7', 'E9', 'E10', 'E11', 'E12', 'E13', 'E15', 'E16',
-                        'E18', 'E19', 'E20', 'E22', 'E23', 'E24', 'E29', 'E30', 'E31', 'E34', 'E35',
-                        'E36', 'E37', 'E39', 'E40', 'E41', 'E42', 'E44', 'E45', 'E46', 'E47', 'E49',
-                        'E50', 'E51', 'E52', 'E54', 'E55', 'E56', 'E58', 'E59', 'E61', 'E66', 'E67',
-                        'E68', 'E69', 'E70', 'E71', 'E72', 'E73', 'E74', 'E75', 'E76', 'E77', 'E78', 
-                        'E79', 'E80', 'E82', 'E83', 'E84', 'E88', 'E89', 'E91', 'E92', 'E93', 'E94', 
-                        'E96', 'E97', 'E97', 'E98', 'E101', 'E102', 'E103', 'E104', 'E105', 'E106', 
-                        'E107', 'E108', 'E109', 'E110', 'E111', 'E112', 'E113', 'E114', 'E115','E116', 'E118']]
-
-asd_ei_roi = asd_ei_roi.mean(skipna=True)
-asd_ei_roi =np.nanmedian(asd_ei_roi,axis=0)
-
-
-#""""Relatives ROI""""
-relatives_ei_roi = df.loc[df['group'] == 'Relatives', df.columns[3:124]]
-relatives_ei_roi =  relatives_ei_roi[['E3', 'E4', 'E5', 'E6', 'E7', 'E9', 'E10', 'E11', 'E12', 'E13', 'E15', 'E16',
-                        'E18', 'E19', 'E20', 'E22', 'E23', 'E24', 'E29', 'E30', 'E31', 'E34', 'E35',
-                        'E36', 'E37', 'E39', 'E40', 'E41', 'E42', 'E44', 'E45', 'E46', 'E47', 'E49',
-                        'E50', 'E51', 'E52', 'E54', 'E55', 'E56', 'E58', 'E59', 'E61', 'E66', 'E67',
-                        'E68', 'E69', 'E70', 'E71', 'E72', 'E73', 'E74', 'E75', 'E76', 'E77', 'E78', 
-                        'E79', 'E80', 'E82', 'E83', 'E84', 'E88', 'E89', 'E91', 'E92', 'E93', 'E94', 
-                        'E96', 'E97', 'E97', 'E98', 'E101', 'E102', 'E103', 'E104', 'E105', 'E106', 
-                        'E107', 'E108', 'E109', 'E110', 'E111', 'E112', 'E113', 'E114', 'E115','E116', 'E118']]
-relatives_ei_roi = relatives_ei_roi.mean(skipna=True)
-relatives_ei_roi= np.nanmedian(relatives_ei_roi,axis=0) 
-
-
-#"""Controls ROI """
-controls_ei_roi = df.loc[df['group'] =='Controls', df.columns[3:124]]
-controls_ei_roi =  controls_ei_roi[['E3', 'E4', 'E5', 'E6', 'E7', 'E9', 'E10', 'E11', 'E12', 'E13', 'E15', 'E16',
-                        'E18', 'E19', 'E20', 'E22', 'E23', 'E24', 'E29', 'E30', 'E31', 'E34', 'E35',
-                        'E36', 'E37', 'E39', 'E40', 'E41', 'E42', 'E44', 'E45', 'E46', 'E47', 'E49',
-                        'E50', 'E51', 'E52', 'E54', 'E55', 'E56', 'E58', 'E59', 'E61', 'E66', 'E67',
-                        'E68', 'E69', 'E70', 'E71', 'E72', 'E73', 'E74', 'E75', 'E76', 'E77', 'E78', 
-                        'E79', 'E80', 'E82', 'E83', 'E84', 'E88', 'E89', 'E91', 'E92', 'E93', 'E94', 
-                        'E96', 'E97', 'E97', 'E98', 'E101', 'E102', 'E103', 'E104', 'E105', 'E106', 
-                        'E107', 'E108', 'E109', 'E110', 'E111', 'E112', 'E113', 'E114', 'E115','E116', 'E118' ]]
-controls_ei_roi = controls_ei_roi.mean(skipna=True)
-controls_ei_roi=np.nanmedian(controls_ei_roi, axis=0)
-
-
-
-""" Plot three groups by ROI  """
-fig, axs = plt.subplots(1, 3, figsize=(16, 7))
-
-# plot the first topomap in the first subplot
-im, _ = mne.viz.plot_topomap(asd_ei_roi, pos=xy_roi, vlim=(min_range_r,max_range_r), cmap='bwr', contours=0, axes=axs[0])
-axs[0].set_title('ASD', fontsize= 18, fontweight='bold')
-
-# plot the second topomap in the second subplot
-im, _ = mne.viz.plot_topomap(relatives_ei_roi, pos=xy_roi, vlim=(min_range_r,max_range_r), cmap='bwr', contours=0, axes=axs[1])
-axs[1].set_title('Relatives', fontsize= 18, fontweight='bold')
-
-# plot the third topomap in the third subplot
-im, _ = mne.viz.plot_topomap(controls_ei_roi, pos=xy_roi, vlim=(min_range_r,max_range_r), cmap='bwr', contours=0, axes=axs[2])
-cbar = plt.colorbar(im, ax=axs, location='bottom', pad=0.5, shrink=0.7)
-cbar.set_label('Excitation/Inhibition ratio', fontsize=18)
-cbar.ax.tick_params(labelsize=14)
-axs[2].set_title('Controls', fontsize= 18, fontweight='bold')
-
-plt.subplots_adjust(top=1.0,
-bottom=0.3,
-left=0.05,
-right=0.98,
-hspace=0.2,
-wspace=0.2)
-plt.show()
-plt.savefig('/Users/julienpichot/Documents/dataset_fei/roi_topomaps.png', dpi=300)
 
 
 
 #%% Descriptives stats and plot 
-
 #Define Hypo and Hyper variable (based on Lefebvre et al (2022) method)
 hypo_columns = ['DUNN' + str(col) for col in [2, 15, 16, 17, 18, 19, 20, 21, 23, 26, 28, 29, 30, 31, 32, 33]]
 hyper_columns = ['DUNN' + str(col) for col in [1, 3, 4, 5, 6, 8, 9, 10, 11, 12, 14, 22, 24, 25, 34, 35, 36, 37, 38]]
@@ -675,10 +440,6 @@ df_filtered['dSSP'] = (df_filtered['dSSP'] - mean_dSSP) / std_dSSP
 summary_demo = df.groupby('group')[['age_years', 'sex', 'qi_total', 'qi_icv', 'qi_irf', 'qi_ivs', 'qi_imt', 'qi_ivt', 'ados_css']].describe().round(2)
 s= summary_demo.T
 
-s.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/2-5s/demo_stats.xlsx', index= True)
-df = pd.read_xlsx()
-
-df.to_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/16y_219_5s.csv', index=False)
 
 def count_sex(x):
     homme_count = (x == 'Homme').sum()
@@ -742,8 +503,6 @@ summary = summary.round(2)
 summary = summary.reindex(['ASD', 'Controls', 'Relatives'])
 summary = summary.T
 
-summary.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/socio-demo-table.xlsx',index=True)
-
 
 agg_funcs = [
     ('mean', 'mean'),
@@ -751,12 +510,11 @@ agg_funcs = [
     ('range', lambda x: f"{x.min()} - {x.max()}")
 ]
 
-# Sélectionnez les colonnes 13 à 125 à partir du DataFrame d'origine
+
 cols = df.columns[279:321]
-# Calculer les statistiques pour chaque groupe
 summary_pheno = df.groupby('group')[cols].agg([np.mean, np.std, np.ptp])
 
-# Renommer les colonnes avec leur vrai nom
+
 new_cols = []
 for col in cols:
     new_cols.append(col + '_mean')
@@ -765,14 +523,8 @@ for col in cols:
 
 summary_pheno.columns = new_cols
 summary_pheno= summary_pheno.T
-summary_pheno.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/pheno_descriptives.xlsx',index=True)
-
-
-
-df = pd.read_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/219_5s.csv')
 
 summary_fEI = df.groupby('group')[['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']].agg(['mean', 'std']).T.round(2)
-summary_fEI.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/fEI-descriptives.xlsx',index=True)
 
 
 
@@ -785,10 +537,7 @@ sns.pairplot(data=df_pl, hue='group', dropna=True, palette= 'muted')
 df_filtered= df
 #fEI average and fEi roi by groups 
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
-#'#448ee4', '#048243', '#7b0323'
-
 colors= {'ASD': '#ab1239',  'Controls':'#2c6fbb', 'Relatives': '#2bb179'}
-#colors = {'ASD': '#75bbfd', 'Relatives': '#6fc276', 'Controls': '#c44240'}
 colors3 = {'ASD': '#070d0d', 'Relatives': '#070d0d', 'Controls': '#070d0d'}
 
 sns.boxplot(ax=axes[0, 0], data=df_filtered, x='group', y='fEI', palette=colors, hue='group', dodge=False, width=0.4,order=['ASD','Controls','Relatives'])
@@ -823,8 +572,7 @@ for ax in axes.flat:
 
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/16y_5s_boxplots.png', dpi=300)
-               
+       
 
 #socio_demo 
 df_filtered = df.loc[df['group'] == 'ASD']
@@ -832,10 +580,7 @@ df_filtered =df
 df_filtered = df[df['group'] != 'Relatives']
 
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(15, 8))
-#colors= {'ASD': '#2c6fbb', 'Relatives': '#40a368', 'Controls': '#be0119'}
 colors= {'ASD': '#ab1239',  'Controls':'#2c6fbb', 'Relatives': '#2bb179'}
-#colors= {'ASD': '#2c6fbb',  'Controls': '#be0119'}
-#colors = {'ASD': '#75bbfd', 'Relatives': '#6fc276', 'Controls': '#c44240'}
 
 sns.scatterplot(ax=axes[0, 0], data=df_filtered, x='age_years', y='fEI', palette=colors, hue='group',s=10)
 axes[0, 0].set_title('Age',fontweight='bold')
@@ -863,9 +608,7 @@ for ax in axes.flat:
 
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/16y_5s_age_and_qi.png', dpi=300)       
-                
-               
+    
 
 # Sensory 
 fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(24, 10))
@@ -904,13 +647,11 @@ axes[2, 2].set_title('Hypersensitivity',fontweight='bold')
 handles, labels = axes[0, 0].get_legend_handles_labels()
 fig.legend(handles, labels, loc='upper center', ncol=len(labels), bbox_to_anchor=(0.5, 1.1))
 
-# Remove legends from all subplots
 for ax in axes.flat:
     ax.legend().remove()
 
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/16y_5s_sensory.png', dpi=300)
 
 
 #SRS
@@ -946,11 +687,10 @@ for ax in axes.flat:
 
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/16y_5s_srs_scatter.png', dpi=300)
 
 
 
-#%% statistics analysis 
+#%% statistical analysis 
 # Dabest
 # create df for dabest
 df['fEI_asd'] = df.loc[df['group'] == 'ASD', 'fEI']
@@ -989,17 +729,6 @@ df_test=df[['fEI_asd','fEI_frontal_asd','fEI_parietal_asd','fEI_occipital_asd',
 ]]
 
 
-df_test = df
-
-
-
-
-
-
-one_way = dabest.load(df_test, idx=(('fEI_asd', 'fEI_controls', 'fEI_relatives'), 
-                                    ('fEI_frontal_asd','fEI_frontal_controls','fEI_frontal_relatives')))
-one_way.hedges_g.plot(raw_marker_size=3, fig_size=(15, 10), swarm_label=('fEI average'), custom_palette=['#ab1239', '#2c6fbb','#2bb179','#ab1239', '#2c6fbb','#2bb179'])
-
 
 
 # fEI average 
@@ -1009,8 +738,6 @@ group_names = {
     'fEI_relatives': 'Relatives*\n(n=26)',
 }
 
-# Load the data and create the plot
-#colors = {'ASD': '#2c6fbb', 'Relatives': '#40a368', 'Controls': '#be0119'}
 one_way = dabest.load(df_test, idx=('fEI_asd', 'fEI_controls', 'fEI_relatives'))
 fig = one_way.hedges_g.plot(raw_marker_size=5, fig_size=(5, 6), swarm_label='fEI average', custom_palette=['#ab1239', '#2c6fbb','#2bb179'])
 fig.suptitle("fEI average", fontsize=14, fontweight='bold')
@@ -1032,10 +759,7 @@ left=0.155,
 right=0.885,
 hspace=0.2,
 wspace=0.2)
-#plt.tight_layout()
-# Show the plot
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_fEI_average.png', dpi=300)
 
 
 #Frontal
@@ -1048,28 +772,24 @@ group_names = {
 frontal_dabest=dabest.load(df_test ,idx=('fEI_frontal_asd','fEI_frontal_controls','fEI_frontal_relatives'))
 fig = frontal_dabest.hedges_g.plot(raw_marker_size=5, fig_size=(5, 6),swarm_label='Frontal fEI',custom_palette=['#ab1239', '#2c6fbb','#2bb179'])
 fig.suptitle("Frontal fEI", fontsize=14, fontweight='bold')
-# Set the x tick label names for the first subplot
+
 ax1 = fig.get_axes()[0]
 ax1.set_xticks(range(len(group_names)))
 ax1.set_xticklabels(group_names.values())
 
-# Set the x tick label names for the second subplot
+
 ax2 = fig.get_axes()[1]
 ax2.set_xticks(range(1,len(group_names)))
 ax2.set_xticklabels(['ASD - Controls', 'ASD - Relatives' ])
 
-# Modify the plot dimensions
+
 fig.subplots_adjust(top=0.945,
 bottom=0.05,
 left=0.155,
 right=0.885,
 hspace=0.2,
 wspace=0.2)
-#plt.tight_layout()
-# Show the plot
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_frontal.png', dpi=300)
-
 
 #Parietal
 group_names = {
@@ -1098,10 +818,7 @@ left=0.155,
 right=0.885,
 hspace=0.2,
 wspace=0.2)
-#plt.tight_layout()
-# Show the plot
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_parietal.png', dpi=300)
 
 
 #Occipital 
@@ -1131,11 +848,7 @@ left=0.155,
 right=0.885,
 hspace=0.2,
 wspace=0.2)
-#plt.tight_layout()
-# Show the plot
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_occipital.png', dpi=300)
-
 
 #Left Temporal
 group_names = {
@@ -1164,10 +877,7 @@ left=0.155,
 right=0.885,
 hspace=0.2,
 wspace=0.2)
-#plt.tight_layout()
-# Show the plot
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_l_temporal.png', dpi=300)
 
 
 # Right Temporal
@@ -1194,162 +904,16 @@ left=0.155,
 right=0.885,
 hspace=0.2,
 wspace=0.2)
-#plt.tight_layout(à)
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_r_temporal.png', dpi=300)
-
-
-# Open the 6 PNG figures
-image1 = Image.open('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_fEI_average.png')
-image2 = Image.open('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_frontal.png')
-image3 = Image.open('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_parietal.png')
-image4 = Image.open('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_occipital.png')
-image5 = Image.open('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_l_temporal.png')
-image6 = Image.open('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_r_temporal.png')
-
-# Créer une nouvelle figure
-fig = plt.figure(figsize=(7,4))  # Adjust the figsize as needed
-
-# Add the figures as subplots in a 1x6 grid
-fig.add_subplot(1, 2, 1, frame_on=False, xticks=[], yticks=[]).imshow(image1)
-fig.add_subplot(1, 2, 2, frame_on=False, xticks=[], yticks=[]).imshow(image2)
-plt.tight_layout()
-plt.show()  # Show the figure
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_combined.png', dpi=300)
-
-fig = plt.figure(figsize=(7,4))  # Adjust the figsize as needed
-fig.add_subplot(1, 2, 1, frame_on=False, xticks=[], yticks=[]).imshow(image3)
-fig.add_subplot(1, 2, 2, frame_on=False, xticks=[], yticks=[]).imshow(image4)
-plt.tight_layout()
-plt.show()  # Show the figure
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_combined_2.png', dpi=300)
 
 
 
-fig = plt.figure(figsize=(7,4))  # Adjust the figsize as needed
-fig.add_subplot(1, 2, 1, frame_on=False, xticks=[], yticks=[]).imshow(image5)
-fig.add_subplot(1, 2, 2, frame_on=False, xticks=[], yticks=[]).imshow(image6)
-
-# Adjust the spacing between subplots
-plt.tight_layout()
-plt.show()  # Show the figure
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/dabest/16y_dabest_combined_3.png', dpi=300)
-
-
-
-
-
-# Load the data using dabest
-one_way = dabest.load(df_test, idx=(('fEI_asd', 'fEI_controls', 'fEI_relatives'), 
-                                    ('fEI_frontal_asd', 'fEI_frontal_controls', 'fEI_frontal_relatives')))
-
-# Create the estimation plot
-fig = one_way.hedges_g.plot(raw_marker_size=3, fig_size=(15, 10), swarm_label='fEI average', custom_palette=['#ab1239', '#2c6fbb', '#2bb179', '#ab1239', '#2c6fbb', '#2bb179'], title_fontsize=14)
-
-# Set the y-axis title
-fig.set_ylabel("Effect Size (Hedges' g)", fontsize=12)
-
-# Show the plot
-plt.show()
 
 
 
 
 #%% Pingouin stats 
-
-print(ttest_results.round(2))
-d = 0.43
-d=0.38
-d=0.68
-d=0.55
-d=0.1
-d=0.33
-
-hedges = pg.convert_effsize(d, 'cohen', 'hedges', nx=118,ny=21)
-print(hedges)
-
-print(eta)
-0.048185603807257595
-
-
-
 df_h = df[df['group'] != 'Relatives']
-df_h=df
-
-
-#fEI average 
-df_h = df[['fEI','group']]
-df_h =df_h.dropna()
-#homeoscadiscity 
-variance_fEI = pg.homoscedasticity(data=df_h, dv='fEI', group='group')
-print(variance_fEI)
-#Anova if equal_var = True 
-aov_fEI = pg.welch_anova(data=df_h, dv='fEI', between='group').round(3)
-print(aov_fEI)
-
-
-#Mean roi all groups 
-df_h = df[['mean_roi','group']]
-df_h =df_h.dropna()
-#homeoscadiscity 
-variance = pg.homoscedasticity(data=df_h, dv='mean_roi', group='group')
-print(variance)
-aov_mean_roi = pg.anova(data=df_h, dv='mean_roi', between='group', detailed=True).round(3)
-print(aov_mean_roi)
-
-
-#frontal
-df_h = df[['frontal_fEI','group']]
-df_h =df_h.dropna()
-#homeoscadiscity 
-variance = pg.homoscedasticity(data=df_h, dv='frontal_fEI', group='group')
-print(variance)
-aov_frontal = pg.welch_anova(data=df_h, dv='frontal_fEI', between='group').round(3)
-print(aov_frontal)
-frontal_pairwise = df_h.pairwise_tukey(dv='frontal_fEI', between='group').round(3)
-print(frontal_pairwise)
-
-#parietal
-df_h = df[['parietal_fEI','group']]
-df_h =df_h.dropna()
-#homeoscadiscity 
-variance = pg.homoscedasticity(data=df_h, dv='parietal_fEI', group='group')
-print(variance)
-aov_parietal = pg.anova(data=df_h, dv='parietal_fEI', between='group', detailed=True).round(3)
-print(aov_parietal)
-parietal_pairwise = df_h.pairwise_tukey(dv='parietal_fEI', between='group').round(2)
-print(parietal_pairwise)
-
-#occipital
-df_h = df[['occipital_fEI','group']]
-df_h =df_h.dropna()
-#homeoscadiscity 
-variance = pg.homoscedasticity(data=df_h, dv='occipital_fEI', group='group')
-print(variance)
-aov_occipital  = pg.anova(data=df_h, dv='occipital_fEI', between='group').round(3)
-print(aov_occipital)
-occipital_pairwise = df_h.pairwise_tukey(dv='occipital_fEI', between='group').round(3)
-print(occipital_pairwise)
-
-#Left Temporal 
-df_h = df[['l_temporal_fEI','group']]
-df_h =df_h.dropna()
-#homeoscadiscity 
-variance = pg.homoscedasticity(data=df_h, dv='l_temporal_fEI', group='group')
-print(variance)
-aov_l_temporal = pg.anova(data=df_h, dv='l_temporal_fEI', between='group', detailed=True).round(3)
-print(aov_l_temporal)
-
-# Right Temporal 
-df_h = df[['r_temporal_fEI','group']]
-df_h =df_h.dropna()
-#homeoscadiscity 
-variance = pg.homoscedasticity(data=df_h, dv='r_temporal_fEI', group='group')
-print(variance)
-aov_r_temporal=pg.anova(df_h, dv='r_temporal_fEI', between='group', detailed=True).round(3)
-print(aov_r_temporal)
-
-
 # t-test 
 df_t = df[df['group'] != 'Relatives']
 
@@ -1368,8 +932,7 @@ normality = pg.normality(df_t, dv='frontal_fEI', group='group')
 print(normality)
 frontal_ttest =pg.ttest(df_t['fEI_frontal_asd'], df_t['fEI_frontal_controls'], correction=True).round(2)
 print(frontal_ttest)
-#fEI_mwu= pg.mwu(df_t['fEI_asd'], df_t['fEI_controls'], alternative='two-sided').round(3)
-#print(fEI_mwu)
+#
 
 
 # parietal_fEI  
@@ -1377,52 +940,41 @@ normality = pg.normality(df_t, dv='parietal_fEI', group='group')
 print(normality)
 parietal_ttest =pg.ttest(df_t['fEI_parietal_asd'], df_t['fEI_parietal_controls'], correction=True).round(2)
 print(parietal_ttest)
-parietal_mwu= pg.mwu(df_t['fEI_parietal_asd'], df_t['fEI_parietal_controls'], alternative='two-sided').round(4)
-print(parietal_mwu)
 
-
-# occipital_fEI sig 16y
+# occipital_fEI
 normality = pg.normality(df_t, dv='occipital_fEI', group='group')
 print(normality)
 occipital_ttest =pg.ttest(df_t['fEI_occipital_asd'], df_t['fEI_occipital_controls'], correction=True).round(2)
 print(occipital_ttest)
-occipital_mwu= pg.mwu(df_t['fEI_occipital_asd'], df_t['fEI_occipital_controls'], alternative='two-sided').round(3)
-print(occipital_mwu)
 
 # l_temporal_fEI 
 normality = pg.normality(df_t, dv='l_temporal_fEI', group='group')
 print(normality)
 l_temporal_ttest =pg.ttest(df_t['fEI_l_temporal_asd'], df_t['fEI_l_temporal_controls'], correction=True).round(2)
 print(l_temporal_ttest)
-l_temporal_mwu= pg.mwu(df_t['fEI_l_temporal_asd'], df_t['fEI_l_temporal_controls'], alternative='two-sided').round(3)
-print(l_temporal_mwu)
+
 
 # r_temporal_fEI 
 normality = pg.normality(df_t, dv='r_temporal_fEI', group='group')
 print(normality)
 r_temporal_ttest =pg.ttest(df_t['fEI_r_temporal_asd'], df_t['fEI_r_temporal_controls'], correction=True).round(2)
 print(r_temporal_ttest)
-r_temporal_mwu= pg.mwu(df_t['fEI_r_temporal_asd'], df_t['fEI_r_temporal_controls'], alternative='two-sided').round(3)
-print(r_temporal_mwu)
 
 #FDR 
-pvals = [.14, .09, .01, .07, 0.65, 0.17]
+pvals = [.....]
 reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
 print(reject, pvals_corr)
 
 # create excel table with t-test results 
 ttest_results = pd.concat([ttest, frontal_ttest, parietal_ttest, occipital_ttest, l_temporal_ttest, r_temporal_ttest], axis=0)
-ttest_results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/new-t-test-results.xlsx',index=True)
 
-df = pd.read_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/219_5s.csv')
-
-df_t = df[df['group'] != 'Relatives']
-df_t = df
+                      
+ 
+df_t = df[df['group'] != 'Relatives']           
 #ANCOVA 
 #fEI
 fEI_ancova =pg.ancova(df_t, dv='fEI', between='group',covar=['age_years']).round(3)
 print(fEI_ancova)
-#pairwise t-test
 fEI_pairwise = df_t.pairwise_tukey(dv='fEI', between='group').round(3)
 print(fEI_pairwise)
 
@@ -1464,90 +1016,18 @@ print(r_temporal_pairwise)
 
 
 #FDR 
-pvals = [.04, .02, .003, .02, 0.65, 0.17]
+pvals = [......]
 reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
 print(reject, pvals_corr)
 
 
 
 #Linear regression for association with clinical variables 
-df_t = df[df['group'] == 'Controls']
 df_h= df[df['group'] == 'ASD']
-df_t= df[df['group'] != 'Relatives']
 
 
 #Lm age
-# create linear model 
-lm_age =pg.linear_regression(df_t['age_years'], df_t['parietal_fEI'], remove_na=True).round(4)
-print(lm_age)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value', 'AIC (Linear)'])
-for region in regions:
-    x = df_h['age_years']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    aic = results_summary.aic
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1],
-        'AIC (Linear)': aic
-    }, ignore_index=True).round(4)
-print(results)
-
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_age.xlsx', index=True )
-
-
-#FDR 
-pvals = [.0837, .0008, .0161, .981, .2587, .2263]
-reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
-print(reject, pvals_corr)
-
-
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value', 'AIC (Linear)', 'AIC (Polynomial)'])
-
-for region in regions:
-    x = df_h['age_years']
-    y = df_h[region]
-    x_poly = np.column_stack((x, x**2))  # Add polynomial terms
-    x_poly = sm.add_constant(x_poly)  # Add a constant term for the intercept
-    
-    model_poly = sm.OLS(y, x_poly, missing='drop')
-    results_summary_poly = model_poly.fit()
-    
-    # Compute AIC for polynomial model
-    aic_poly = results_summary_poly.aic
-    
-    # Compute AIC for linear model
-    x_linear = sm.add_constant(x)
-    model_linear = sm.OLS(y, x_linear, missing='drop')
-    results_summary_linear = model_linear.fit()
-    aic_linear = results_summary_linear.aic
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary_linear.params[0],
-        'Slope': results_summary_linear.params[1],
-        'R-squared': results_summary_linear.rsquared,
-        'p-value': results_summary_linear.pvalues[1],
-        'AIC (Linear)': aic_linear,
-        'AIC (Polynomial)': aic_poly
-    }, ignore_index=True).round(4)
-
-print(results)
-
-print(results[['Region', 'AIC (Linear)', 'AIC (Polynomial)']])
-
-
+# Linear model 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -1593,43 +1073,16 @@ for region in regions:
 
 print(results)
 
-
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'R-squared', 'AIC'])
-
-for region in regions:
-    x = df_h['age_years']
-    y = df_h[region]
-
-    # Polynomial regression model (second order)
-    x_poly = np.column_stack((x, x**2))  # Add polynomial terms
-    x_poly = sm.add_constant(x_poly)  # Add a constant term for the intercept
-    
-    model_poly = sm.OLS(y, x_poly, missing='drop')
-    results_summary_poly = model_poly.fit()
-    aic_poly = results_summary_poly.aic
-    
-    results = results.append({
-        'Region': region,
-        'Model': 'Polynomial',
-        'Intercept': results_summary_poly.params[0],
-        'Slope': results_summary_poly.params[1],
-        'Slope^2': results_summary_poly.params[2],
-        'R-squared': results_summary_poly.rsquared,
-        'AIC': aic_poly
-    }, ignore_index=True)
-
-print(results)
+#FDR 
+pvals = [....]
+reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
+print(reject, pvals_corr)
 
 
 
 
 
 #Lm QI total 
-lm_qi_total =pg.linear_regression(df_h['parietal_fEI'], df_h['qi_total'], remove_na=True).round(2)
-print(lm_qi_total)
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -1648,10 +1101,9 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_qi.xlsx', index=True )
 
 #FDR 
-pvals = [.05, .0005, .004, .8, 0.3, 0.1]
+pvals = [....]
 reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
 print(reject, pvals_corr)
 
@@ -1703,9 +1155,6 @@ print(results)
 
 
 #Lm QI IRF
-lm_qi_irf =pg.linear_regression(df_h['r_temporal_fEI'], df_h['qi_irf'], remove_na=True).round(4)
-print(lm_qi_irf) 
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -1724,10 +1173,6 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm/lm_irf.xlsx', index=True )
-
-results_summary.pvalues.round(3)
-
 
 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
@@ -1776,9 +1221,6 @@ for region in regions:
 print(results)
 
 #Lm QI ICV
-lm_qi_icv =pg.linear_regression(df_h['fEI'], df_h['qi_icv'], remove_na=True).round(3)
-print(lm_qi_icv)
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -1797,12 +1239,9 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm/lm_icv.xlsx', index=True )
-
 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
-
 for region in regions:
     x = df_h['qi_icv']
     y = df_h[region]
@@ -1848,10 +1287,6 @@ for region in regions:
 
 
 #Lm QI IVS
-lm_qi_ivs =pg.linear_regression(df_h['fEI'], df_h['qi_ivs'], remove_na=True).round(2)
-print(lm_qi_ivs)
-
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -1870,7 +1305,6 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm/lm_ivs.xlsx', index=True )
 
 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
@@ -1919,9 +1353,6 @@ for region in regions:
 
 
 #Lm QI IMT 
-lm_qi_imt =pg.linear_regression(df_h['fEI'], df_h['qi_imt'], remove_na=True).round(2)
-print(lm_qi_imt)
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -1940,9 +1371,6 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm/lm_imt.xlsx', index=True )
-
-
 
 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
@@ -1990,9 +1418,6 @@ for region in regions:
 
 
 #Lm QI IVT 
-lm_qi_ivt =pg.linear_regression(df_h['fEI'], df_h['qi_ivt'], remove_na=True).round(3)
-print(lm_qi_ivt)
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -2011,8 +1436,6 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm/lm_ivt.xlsx', index=True )
-
 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
@@ -2059,9 +1482,6 @@ for region in regions:
 
 
 #Lm Hyper 
-lm_hyper =pg.linear_regression(df_h[['occipital_fEI']], df_h['hyper'],remove_na=True).round(2)
-print(lm_hyper)
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -2080,8 +1500,6 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/significatif_lm/lm_hyper.xlsx', index=True )
-
 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
@@ -2127,16 +1545,7 @@ for region in regions:
     }, ignore_index=True)
 
 
-sns.regplot(x=df_h['r_temporal_fEI'],y=df_h['hyper'],scatter_kws={'s': 10},order=2)
-sns.regplot(x=df_h['frontal_fEI'],y=df_h['hyper'],scatter_kws={'s': 10},order=2)
-
-#Lm Hypo ici 
-lm_hypo =pg.linear_regression(df_h[['fEI','frontal_fEI','parietal_fEI','occipital_fEI','l_temporal_fEI','r_temporal_fEI']], df_h['hypo'], remove_na=True).round(2)
-print(lm_hypo)
-lm_hypo =pg.linear_regression(df_h[['fEI']], df_h['hypo'],remove_na=True).round(2)
-print(lm_hypo)
-
-
+#Lm Hypo 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -2211,12 +1620,7 @@ sns.regplot(x=df_h['frontal_fEI'],y=df_h['hyper'],scatter_kws={'s': 10},order=2)
 
 
 
-#Lm SRS total  ici 
-lm_srs_total =pg.linear_regression(df_h[['parietal_fEI']], df_h['srs_total_t'], remove_na=True).round(2)
-print(lm_srs_total)
-
-table = pg.print_table(lm_age, floatfmt='.2f')
-
+#Lm SRS total 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
 for region in regions:
@@ -2235,9 +1639,8 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_srs_total.xlsx', index=True )
-
-pvals = [.1, 1.0, .04, .06, 0.1, 0.1]
+                      
+pvals = [.....]
 reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
 print(reject, pvals_corr)
 
@@ -2287,31 +1690,6 @@ for region in regions:
 
 
 #Lm SRS social motivation
-lm_srs_social_motivation =pg.linear_regression(df_h[['fEI']], df_h['srs_social_motivation_t'], remove_na=True).round(2)
-print(lm_srs_social_motivation)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['srs_social_motivation_t']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_srs_mootivation.xlsx', index=True )
-
-
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -2360,31 +1738,6 @@ for region in regions:
 
 
 #Lm SRS social communication
-lm_srs_social_communication =pg.linear_regression(df_h[['frontal_fEI']], df_h['srs_social_communication_t'], remove_na=True).round(2)
-print(lm_srs_social_communication)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['srs_social_communication_t']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-
-print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_srs_com.xlsx', index=True )
-
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -2430,35 +1783,6 @@ for region in regions:
 
 
 #Lm SRS social awarenes
-lm_srs_social_awareness =pg.linear_regression(df_h[['r_temporal_fEI']], df_h['srs_social_awareness_t'], remove_na=True).round(2)
-print(lm_srs_social_awareness)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['srs_social_awareness_t']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-    
-print(results)
-#FDR 
-pvals = [.11 , .98, .06, .02, 0.18, 0.14]
-reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
-print(reject, pvals_corr)
-
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_srs_awareness.xlsx', index=True )
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -2503,29 +1827,6 @@ for region in regions:
     }, ignore_index=True)
 
 #Lm SRS social cognition
-lm_srs_social_cognition =pg.linear_regression(df_h[['parietal_fEI']], df_h['srs_social_cognition_t'], remove_na=True).round(2)
-print(lm_srs_social_cognition)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['srs_social_cognition_t']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_srs_cognition.xlsx', index=True )
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -2570,29 +1871,6 @@ for region in regions:
     }, ignore_index=True)
 
 #Lm SRS RRB
-lm_srs_RRB =pg.linear_regression(df_h[['fEI']], df_h['srs_RRB_t'], remove_na=True).round(2)
-print(lm_srs_RRB)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['srs_RRB_t']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_srs_rrb.xlsx', index=True )
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -2637,33 +1915,8 @@ for region in regions:
     }, ignore_index=True)
     
     
-    
-    
+   
 #ADHD
-lm_adhd =pg.linear_regression(df_h[['fEI']], df_h['adhd_rs'], remove_na=True).round(2)
-print(lm_adhd)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['adhd_rs']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_adhd.xlsx', index=True )
-
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -2728,7 +1981,6 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_rbs_total.xlsx', index=True )
 
 
 # RBS stereotypies
@@ -2751,7 +2003,6 @@ for region in regions:
     }, ignore_index=True).round(2)
     
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_rrb_stereotype.xlsx', index=True )
 
 
 
@@ -2775,8 +2026,6 @@ for region in regions:
     }, ignore_index=True).round(2)
     
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_rrb_self_injury.xlsx', index=True )
-
 
 
 # RBS Compulsive behaviors
@@ -2796,20 +2045,9 @@ for region in regions:
         'Slope': results_summary.params[1],
         'R-squared': results_summary.rsquared,
         'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-    
+    }, ignore_index=True).round(2)  
 print(results)
 
-df= pd.read_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/16y_219_5s.csv')
-
-
-
-
-pvals = [.02, .04, .13, .10, .12, .1]
-reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
-print(reject, pvals_corr)
-    
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_rbs_compulsifs.xlsx', index=True )
 
 # RBS ritualistic 
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
@@ -2829,9 +2067,7 @@ for region in regions:
         'R-squared': results_summary.rsquared,
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
-    
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_rrb_ritualistic.xlsx', index=True )
 
 
 # RBS Sameness
@@ -2854,7 +2090,6 @@ for region in regions:
     }, ignore_index=True).round(2)
     
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_rbs_sameness.xlsx', index=True )
 
 
 # RBS restricted behaviors
@@ -2877,7 +2112,6 @@ for region in regions:
     }, ignore_index=True).round(4)
     
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/significatif_lm//lm_rbs_restricted.xlsx', index=True )
 
 sns.regplot(x=df_h['r_temporal_fEI'],y=df_h['hyper'],scatter_kws={'s': 10},order=2
 pvals = [.2, .2, .02, .8, .5, .4])
@@ -2907,46 +2141,9 @@ for region in regions:
         'p-value': results_summary.pvalues[1]
     }, ignore_index=True).round(2)
 print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_ados_css.xlsx', index=True )
-
 
 
 #ADI social interaction 
-lm_adi_social_interaction=pg.linear_regression(df_h[['fEI']], df_h['adi_social_interaction'], remove_na=True).round(2)
-print(lm_adi_social_interaction)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['adi_social_interaction']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(3)
-    
-print(results)
-
-sns.lmplot(data=df_t, y='adi_communication',x='parietal_fEI',scatter_kws={'s': 10}, fit_reg=True, order=2)
-
-
-pvals = [.01, .04, .02, .03, .5, .02]
-reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
-print(reject, pvals_corr)
-    
-
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_adi_social.xlsx', index=True )
-
-
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -2992,34 +2189,6 @@ for region in regions:
 
 
 #ADI communication  
-lm_adi_communication =pg.linear_regression(df_h[['fEI']], df_h['adi_communication'], remove_na=True).round(2)
-print(lm_adi_communication)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['adi_communication']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(4)
-    
-print(results)
-pvals = [.008, .04, .01, .009, .44, .004]
-reject, pvals_corr = pg.multicomp(pvals, method='fdr_bh')
-print(reject, pvals_corr)
-    
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_adi_comm.xlsx', index=True )
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -3064,31 +2233,6 @@ for region in regions:
     }, ignore_index=True)
 
 #ADI CRR 
-lm_adi_crr =pg.linear_regression(df_h[['occipital_fEI']], df_h['adi_crr'], remove_na=True).round(2)
-print(lm_adi_crr)
-
-regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
-results = pd.DataFrame(columns=['Region', 'Intercept', 'Slope', 'R-squared', 'p-value'])
-for region in regions:
-    x = df_h['adi_crr']
-    y = df_h[region]
-    x = sm.add_constant(x)  # Add a constant term for the intercept
-    
-    model = sm.OLS(y, x, missing='drop')
-    results_summary = model.fit()
-    
-    results = results.append({
-        'Region': region,
-        'Intercept': results_summary.params[0],
-        'Slope': results_summary.params[1],
-        'R-squared': results_summary.rsquared,
-        'p-value': results_summary.pvalues[1]
-    }, ignore_index=True).round(2)
-    
-print(results)
-results.to_excel('/Users/julienpichot/Documents/fEI_2023/figure/5s/non_significatif_lm//lm_adi_crr.xlsx', index=True )
-
-
 regions = ['fEI', 'frontal_fEI', 'parietal_fEI', 'occipital_fEI', 'l_temporal_fEI', 'r_temporal_fEI']
 results = pd.DataFrame(columns=['Region', 'Model', 'Intercept', 'Slope', 'Slope^2', 'p-value', 'R-squared', 'AIC'])
 
@@ -3159,255 +2303,8 @@ print(results)
 
 
 
-# Manova 
-df_h= df[df['group'] == 'ASD']
-X = df_h[['hypo','fEI','frontal_fEI','parietal_fEI','occipital_fEI','l_temporal_fEI','r_temporal_fEI']]
-pg.multivariate_normality(X, alpha=.05)
-sns.jointplot(df_h, x='fEI',y='adi_communication')
 
-manova_result = MANOVA.from_formula('frontal_fEI + parietal_fEI + occipital_fEI + l_temporal_fEI + r_temporal_fEI ~ age_years', df_h)
-print(manova_result.mv_test())
-
-df= pd.read_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/16y_219_5s.csv')
-
-
-#%%
-"""Clustering """ 
-
-
-
-df_c = df.loc[df['group'] == 'ASD']
-X = df.iloc[:, 3:124]
-imputer = SimpleImputer(strategy='mean')  # Use mean imputation, but you can choose another strategy
-X_imputed = imputer.fit_transform(X)  # Impute the missing values
-model = KMeans(n_clusters=3)
-model.fit(X_imputed)
-model.predict(X_imputed)
-plt.scatter(X_imputed[:, 0], X_imputed[:, 1], c=model.predict(X_imputed))
-plt.show()
-
-
-
-df_c = df.loc[df['group'] == 1]
-X = df.iloc[:, 3:124].dropna()
-X=X.values
-model = KMeans(n_clusters=4)
-model.fit(X)
-model.predict(X)
-
-plt.scatter(X[:, 0], X[:, 0], c=model.predict(X))
-
-inertia = [] 
-k_range = range(1,20)
-for k in k_range :
-    model=KMeans(n_clusters=k).fit(X)
-    inertia.append(model.inertia_)
-
-plt.plot(k_range, inertia)
-plt.xlabel('nombre de cluster')
-plt.ylabel('cout du model (inertia)')
-
-
-
-df_c = df.loc[df['group'] == 'ASD']
-X = df_c.iloc[:, 2].dropna()
-X = X.reshape(-1, 1)  # Convert X to a NumPy array using .values
-X=X.values
-model = KMeans(n_clusters=3, random_state=42)
-model.fit(X)
-model.predict(X)
-plt.scatter(X[:, 0], X[:, 0], c=model.predict(X))
-model.inertia_
-model.cluster_centers_
-
-
-
-# Assuming 'model.labels_' is a list or array containing the labels
-labels = model.labels_
-
-# Create a new DataFrame with index from X and labels as a column
-labels_df = pd.DataFrame({'Labels': labels}, index=X.index)
-
-# Concatenate the original DataFrame 'X' and the new labels DataFrame
-X_with_labels = pd.concat([X, labels_df], axis=1)
-
-
-
-# Assuming 'labels_df' is your DataFrame with the labels and has the same index as 'df'
-merged_df = pd.merge(df, labels_df, left_index=True, right_index=True)
-
-df_t = merged_df
-    
-df_test=df 
-# Concatenate the original DataFrame 'X' and the new labels DataFrame
-X = pd.concat([X, labels_df], axis=1)
-
-inertia = [] 
-k_range = range(1,10)
-for k in k_range :
-    model=KMeans(n_clusters=k).fit(X)
-    inertia.append(model.inertia_)
-
-plt.plot(k_range, inertia)
-plt.xlabel('nombre de cluster')
-plt.ylabel('cout du model (inertia)')
-
-
-
-
-
-df_c = df.loc[df['group'] == 'ASD']
-X = df.iloc[:, 2].dropna().values  # Drop NaN values and convert to a 1D array
-X = X.reshape(-1, 1)  # Reshape X to a 2D array with a single feature
-model = BayesianGaussianMixture(n_components=3,random_state=42)
-model.fit(X)
-model.predict(X)
-X=X.values
-plt.scatter(X[:, 0], X[:, 0], c=model.predict(X))
-model.inertia_
-
-
-inertia = [] 
-k_range = range(1,10)
-for k in k_range :
-    model=KMeans(n_clusters=k).fit(X)
-    inertia.append(model.inertia_)
-
-plt.plot(k_range, inertia)
-plt.xlabel('nombre de cluster')
-plt.ylabel('cout du model (inertia)')
-
-
-
-df=pd.read_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/16y_219_5s.csv')
-
-
-
-#%% 
-
-
-#ligne utile df : 
-    
- # lire fichier excel ou csv simplement changer read_csv ou exel et nom du fichier 
- df= pd.read_csv('/Users/julienpichot/Documents/fEI_2023/dataset_fei/16y_219_5s.csv')
-# save 
-df.to_csv ('/path/to/save/name', index = False or True  #as u want )
-
-# remplacer valeur par  strg ou ce qu'on veut 
-df.loc[:, 'sex'] = df['sex'].replace({ 1: 'Homme', 2: 'Femme'})
-df.loc[:, 'group'] = df['group'].replace({0: 'Controls', 1: 'ASD', 2: 'Relatives'})
-
-# sélectionner les x premières lignes si sélectionner colonne alors [:, 3:124]    
-df=df.iloc[:388, :]
-
-# retirer sujet pour qui diag = 3 peut remplacer diag par ce qu'in veut et la valeur à cible également 
-df = df[df['diag'] != 3]
-
-#retire certaines lignes par leur index 
-df= df.drop([53,87])
-df= df.drop([13,14,20,52,81,83,100,148,155,178,180,185]) #  DI et epilepsie 
-
-# compter le nombre de sujets par groupe 
-counts =df['group'].value_counts()
-print(counts)
-# donner l'âge max pour group ASD 
-df.loc[df['group'] == 'ASD', 'age_years'].max()
-# obtenir max pour une colonne 
-df_filtered['age_years'].max()
-# compter le nombre de sujet relatives dans le df 
-df['group'].value_counts()['Relatives']
-
-
-# remplacer une expression/valeur par autre chose ou par nan dans tout le df 
-df=df.replace('NF',np.nan)
-df.replace('NC', np.nan, inplace=True)
-
-# remplacer une certaine valeurs  par une autre ou des nan pour une liste de colonnes
-notb_cols = ['NOTB1', 'NOTB2', 'NOTB3', 'NOTB4', 'NOTB5', 'NOTB6', 'NOTB7']
-df[notb_cols]=df[notb_cols].replace(0, np.nan)
-
-## remplacer string pour une colonne ou tout le df 
-df_c=df['column_name'].str.replace('>', '') # 
-df['srs_total_t'] = df['srs_total_t'].str.replace('>', '')
-df = df.replace('>', '', regex=True) # replace str in all df 
-
-df['srs_total_t'] = df['srs_total_t'].str.replace('>', '')
-
-df['subject'] = df['subject'].str.replace('-RS_eeg', '')
-
-## cnvertir les colonnes en float (numérique)
-df[df.columns[323:372]] = df[df.columns[323:372]].astype(float)
-df['age_years'] = df['age_years'].astype('float64')
-
-#
-df[['srs_total_t','adhd_rs']]=df[['srs_total_t','adhd_rs']].astype(float)
-df.iloc[:, 55] = df.iloc[:, 55].astype(float)
-df[['ados_css']]=df[['ados_css']].astype(float)
-
-df[['srs_RRB_t','srs_total_t','adhd_rs']]=df[['srs_RRB_t','srs_total_t','adhd_rs']].astype(float)
-
-df[['srs_social_motivation_t', 'srs_social_awareness_t','srs_social_cognition_t','srs_social_communication_t',]] = df[['srs_social_motivation_t', 'srs_social_awareness_t','srs_social_cognition_t','srs_social_communication_t']].astype(float)
-
-
-df[['qi_icv','qi_imt','qi_irf','qi_ivs','qi_ivt','qi_total']] = df[['qi_icv','qi_imt','qi_irf','qi_ivs','qi_ivt','qi_total']].astype(float)
-
-
-# renommer des colonnes gauche nom d'origine, droit nouveau nom souhaité
-new_names = {'NOTB1': 'Tactile Sensitivity',
-             'NOTB2': 'Taste/Smell Sensitivity',
-             'NOTB3': 'Movement Sensitivity',
-             'NOTB4': 'Underresponsive/Seeks Sensation',
-             'NOTB5': 'Auditory Filtering',
-             'NOTB6': 'Low Energy/Weak',
-             'NOTB7': 'Visual Auditory Sensitivity'}
-df = df.rename(columns=new_names)
-
-
-
-df= df.loc[~((df['group'] == 'ASD') & (df['age_years'] > 16))] ## enlever sujet de plus de 16ans dans un df 
-
-#creer un df avec seulement les sujets dans le groupe contrôle 
-dfs = df[df['group'] == 'Controls']
-# créer un df sans les sujets controles 
-dfs = df[df['group'] != 'Controls'] 
-# trier en fonction âge et groupe 
-df_r= df.loc[~((df['group'] == 'ASD') & (df['age_years'] > 21))] # ne pas prendre ceux qui ont plus de 21 
-df_filtered = df.loc[~((df['group'] == 'ASD') & (df['age_years'] < 17))] # ne pas prendre ceux qui ont moins de 17 
-
-# créer un nouveau df_filtered avec seulement les individus de moins de 18 ans 
-df_filtered = df.loc[df['age_years'] < 18]
-
-
-# obtenir localisation d'une colonne 
-idx = df.columns.get_loc('srs_RRB')
-# renommer une colonne à partir de son numero index 
-df.columns.values[55] = 'srs_RRB_t'
-
-
-# for scaling need to import standardscaler from sklearn
-scaler = StandardScaler()
-df['age_years_s'] = scaler.fit_transform(df[['age_years']])
-
-
-df_h= df[df['group']=='ASD']
-df_h = df_h[['fEI','adhd_rs']]
-df_h =df_h.dropna()
-
-
-f
-from pingouin import power_ttest2n
-
-print('power: %.4f' % power_ttest2n(nx=118, ny=21, d=0.33))
-
-print('power: %.4f' % power_corr(r=0.17, n=117))
-
-
-
-
-df_filtered= df_h
-
-
-
+# Regression plot 
 # Create the figure and axes
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(36, 24))
 
@@ -3465,17 +2362,12 @@ axes[1, 1].text(0.71, 0.97, "R2=0.07; p=0.01", transform=axes[1, 1].transAxes,
                 fontsize=11, verticalalignment='top', bbox=dict(facecolor='white', edgecolor='black'))
 
 plt.delaxes(axes[1, 2])
-
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_plot/regplot_adi_com.png', dpi=300)
 
-
-
+                      
+# ADI Social interaction
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(18, 12))
-
-# Set the background color to light gray for all subplots
-#fig.patch.set_facecolor('#F0F0F0')
 background_color = 'white'
 for ax in axes.flatten():
     ax.set_facecolor(background_color)
@@ -3528,17 +2420,12 @@ axes[1, 1].text(0.71, 0.97, "R2=0.05; p=0.03", transform=axes[1, 1].transAxes,
                 fontsize=11, verticalalignment='top', bbox=dict(facecolor='white', edgecolor='black'))
 
 plt.delaxes(axes[1, 2])
-
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_plot/regplot_adi_social.png', dpi=300)
 
 
 #Age lm regplot 
 fig, axes = plt.subplots(nrows=2, ncols=3, figsize=(36, 25))
-
-# Set the background color to light gray for all subplots
-#fig.patch.set_facecolor('#F0F0F0')
 background_color = 'white'
 for ax in axes.flatten():
     ax.set_facecolor(background_color)
@@ -3576,15 +2463,10 @@ plt.delaxes(axes[1,1])
 plt.delaxes(axes[1,2])
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_plot/regplot_age.png', dpi=300)
 
-
-
+                      
 #SRS total et awareness 
 fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(14,8))
-
-# Set the background color to light gray for all subplots
-#fig.patch.set_facecolor('#F0F0F0')
 background_color = 'white'
 for ax in axes.flatten():
     ax.set_facecolor(background_color)
@@ -3625,22 +2507,13 @@ axes[1, 1].set_ylabel('SRS social awareness')
 
 axes[1, 1].text(0.71, 0.97, "R2=0.05; p=0.02; FDR=0.1", transform=axes[1, 1].transAxes,
                 fontsize=11, verticalalignment='top', bbox=dict(facecolor='white', edgecolor='black'))
-
-
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_plot/regplot_srs.png', dpi=300)
 
 
 
 
-
-
-
-#%%
-import matplotlib.pyplot as plt
-import seaborn as sns
-
+# Hyper (polynomial (order =2))
 fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(12, 4))
 
 # Set the background color to light gray for all subplots
@@ -3671,87 +2544,11 @@ axes[1].text(0.75, 0.97, "R2=0.09; p=0.03", transform=axes[1].transAxes,
 #plt.subplots_adjust(top=0.855, bottom=0.39, left=0.045, right=0.96, hspace=0.2, wspace=0.2)
 plt.tight_layout()
 plt.show()
-plt.savefig('/Users/julienpichot/Documents/fEI_2023/figure/5s/lm_plot/regplot_hyper.png', dpi=300)
 
-
-
-sns.regplot(x=df_h['r_temporal_fEI'],y=df_h['hyper'],scatter_kws={'s': 10},order=2)
-sns.regplot(x=df_h['frontal_fEI'],y=df_h['hyper'],scatter_kws={'s': 10},order=2)
-
-
-
-### 
-ei_all = df.iloc[:, 3:124] ## to obtain the ei ratio for each electrodes for all subject
-ei_all= np.nanmean(ei_all,axis=0)
-# determine interval for plot all electrodes with function plot_interval 
-min_range_r, max_range_r = plot_interval(ei_all)
-
-
-# for EI 130:251
-    """ASD """
-asd_ei = df.loc[df['group'] == 'ASD', df.columns[3:124]] ## get only asd patient from dataframe
-asd_ei = asd_ei.mean(skipna=True)
-asd_ei =np.nanmedian(asd_ei,axis=0)
-
-
-    """Relatives""" 
-relatives_ei= df.loc[df['group'] == 'Relatives', df.columns[3:124]]
-relatives_ei = relatives_ei.mean(skipna=True)
-relatives_ei= np.nanmedian(relatives_ei,axis=0) 
-
-
-    """Controls"""
-controls_ei=df.loc[df['group'] == 'Controls', df.columns[3:124]]
-controls_ei = controls_ei.mean(skipna=True)
-controls_ei=np.nanmedian(controls_ei, axis=0)
-
-
-
-
-
-
-
-
-from numpy import ttest_ind
-from mne.stats import permutation_cluster_test
-from mne.stats import permutation_cluster_test
-from scipy import stats
-import numpy as np
-
-
-
-pval = 0.05  # arbitrary
-dfn = 121 - 1  # degrees of freedom numerator
-dfd = 139 - 121  # degrees of freedom denominator
-thresh = scipy.stats.f.ppf(1 - pval, dfn=dfn, dfd=dfd)  # F distribution
-
-
-asd_ei = df.loc[df['group'] == 'ASD', df.columns[3:124]]
-controls_ei = df.loc[df['group'] == 'Controls', df.columns[3:124]]
-a = np.array(asd_ei)
-b = np.array(controls_ei)
-X = [a, b]
-
-
-stat_fun = lambda x, y: np.array([stats.ttest_ind(x, y, equal_var=False, nan_policy='omit')[0]])
-
-T_obs, clusters, cluster_pv, H0 = permutation_cluster_test(X, threshold=thresh, stat_fun=stat_fun, tail=0)
-
-print("T-values:", T_obs)
-print("Clusters:", len(clusters))
-print("Cluster p-values:", cluster_pv)
-
-mne.viz.plot_topomap(T_obs, xy_pos,cmap='bwr')
-
-
-
-
-
-# 
-# ttest on each electrode 
-
+                      
+           
+# Permutation t-test (ttest on each electrode)
 ##  with ttest pg
-
 asd_ei = df.loc[df['group'] == 'ASD', df.columns[3:124]]
 controls_ei = df.loc[df['group'] == 'Controls', df.columns[3:124]]
 
@@ -3813,104 +2610,3 @@ significant_p_values = results_df[results_df['P-value'] < 0.05]
 count = len(significant_p_values)
 
 print("Number of p-values < 0.05:", count)
-
-
-
-
-#%% wDNF and wAmp
-
-#df=df.drop([35,111, 112])
-ei_all = df.iloc[:, 251:372] ## to obtain the ei ratio for each electrodes for all subject
-ei_all= np.nanmean(ei_all,axis=0)
-# determine interval for plot all electrodes with function plot_interval 
-min_range_r, max_range_r = plot_interval(ei_all)
-
-
-# for EI 130:251
-    """ASD """
-asd_ei = df.loc[df['group'] == 'ASD', df.columns[251:372]] ## get only asd patient from dataframe
-asd_ei = asd_ei.mean(skipna=True)
-asd_ei =np.nanmedian(asd_ei,axis=0)
-
-
-    """Relatives""" 
-relatives_ei= df.loc[df['group'] == 'Relatives', df.columns[251:372]]
-relatives_ei = relatives_ei.mean(skipna=True)
-relatives_ei= np.nanmedian(relatives_ei,axis=0) 
-
-
-    """Controls"""
-controls_ei=df.loc[df['group'] == 'Controls', df.columns[251:372]]
-controls_ei = controls_ei.mean(skipna=True)
-controls_ei=np.nanmedian(controls_ei, axis=0)
-
-
-""" Plot three groups for all electrodes """
-fig, axs = plt.subplots(1, 3, figsize=(12, 6))
-
-im, _ = mne.viz.plot_topomap(asd_ei, pos=xy_pos, vlim=(min_range_r, max_range_r), cmap='bwr', contours=0, axes=axs[0])
-axs[0].set_title('ASD\nn=118', fontsize= 14, fontweight='bold')
-
-im, _ = mne.viz.plot_topomap(controls_ei, pos=xy_pos, vlim=(min_range_r, max_range_r), cmap='bwr', contours=0, axes=axs[1])
-axs[1].set_title('Controls\nn=21', fontsize= 14, fontweight='bold')
-
-im,_= mne.viz.plot_topomap(relatives_ei, pos=xy_pos, vlim=(min_range_r, max_range_r), cmap='bwr', contours=0, axes=axs[2])
-cbar = plt.colorbar(im, ax=axs, location='bottom', pad=0.5, shrink=0.5)
-cbar.set_label('Amplitude', fontsize=18)
-cbar.ax.tick_params(labelsize=14)
-axs[2].set_title('Relatives\nn=26', fontsize= 14, fontweight='bold')
-
-plt.subplots_adjust(top=1.0, bottom=0.3, left=0.05, right=0.98, hspace=0.2, wspace=0.2)
-plt.show()
-
-
-# Amplitude
-ei_all = df.iloc[:, 372:493] ## to obtain the ei ratio for each electrodes for all subject
-ei_all= np.nanmean(ei_all,axis=0)
-# determine interval for plot all electrodes with function plot_interval 
-min_range_r, max_range_r = plot_interval(ei_all)
-
-
-# for EI 130:251
-    """ASD """
-asd_ei = df.loc[df['group'] == 'ASD', df.columns[372:493]] ## get only asd patient from dataframe
-asd_ei = asd_ei.mean(skipna=True)
-asd_ei =np.nanmedian(asd_ei,axis=0)
-
-
-    """Relatives""" 
-relatives_ei= df.loc[df['group'] == 'Relatives', df.columns[372:493]]
-relatives_ei = relatives_ei.mean(skipna=True)
-relatives_ei= np.nanmedian(relatives_ei,axis=0) 
-
-
-    """Controls"""
-controls_ei=df.loc[df['group'] == 'Controls', df.columns[372:493]]
-controls_ei = controls_ei.mean(skipna=True)
-controls_ei=np.nanmedian(controls_ei, axis=0)
-
-
-""" Plot three groups for all electrodes """
-fig, axs = plt.subplots(1, 3, figsize=(12, 6))
-
-im, _ = mne.viz.plot_topomap(asd_ei, pos=xy_pos, vlim=(min_range_r, max_range_r), cmap='bwr', contours=0, axes=axs[0])
-axs[0].set_title('ASD\nn=118', fontsize= 14, fontweight='bold')
-
-im, _ = mne.viz.plot_topomap(controls_ei, pos=xy_pos, vlim=(min_range_r, max_range_r), cmap='bwr', contours=0, axes=axs[1])
-axs[1].set_title('Controls\nn=21', fontsize= 14, fontweight='bold')
-
-im,_= mne.viz.plot_topomap(relatives_ei, pos=xy_pos, vlim=(min_range_r, max_range_r), cmap='bwr', contours=0, axes=axs[2])
-cbar = plt.colorbar(im, ax=axs, location='bottom', pad=0.5, shrink=0.5)
-cbar.set_label('DNF', fontsize=18)
-cbar.ax.tick_params(labelsize=14)
-axs[2].set_title('Relatives\nn=26', fontsize= 14, fontweight='bold')
-
-plt.subplots_adjust(top=1.0, bottom=0.3, left=0.05, right=0.98, hspace=0.2, wspace=0.2)
-plt.show()
-
-
-
-
-
-
-

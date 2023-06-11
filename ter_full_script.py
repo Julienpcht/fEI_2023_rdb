@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-The following script contains all the code used to run the analyses, as well as the code to reproduce all the figures
+The following script contains all the code to reproduce analyses and figures
 
 Excitation/Inhibition Ratio in Python. 
 Matlab to Python translation from Bruining et al (2020) :
